@@ -236,10 +236,12 @@ def query_cmd(ctx, query_text, top_k, tol, filter_group):
     sheet_name = ctx.obj
     console.print(f"\n[bold]Searching '[cyan]{sheet_name}[/]' for:[/] {query_text}\n")
     with get_connection() as conn:
+        sheet = _require_sheet(conn, sheet_name)
+        params = get_params(conn, sheet.id)
         with Status("[dim]Loading model…[/]", console=console):
             results = semantic_search(conn, sheet_name, query_text,
                                       top_k=top_k, tol=tol, filter_group=filter_group)
-    print_search_results(results)
+    print_search_results(results, params)
 
 
 # ---------------------------------------------------------------------------

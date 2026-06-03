@@ -129,11 +129,14 @@ def print_kv_table(title: str, data: dict[str, str], value_style: str = "white")
     console.print(table)
 
 
-def print_search_results(results: list[SearchResult]) -> None:
+def print_search_results(
+    results: list[SearchResult], params: dict[str, str] | None = None
+) -> None:
     if not results:
         console.print("[dim]No results found.[/]")
         return
 
+    params = params or {}
     table = Table(box=box.SIMPLE_HEAD, show_header=True)
     table.add_column("Score", justify="right", width=6)
     table.add_column("ID", style="dim", width=5, justify="right")
@@ -149,7 +152,7 @@ def print_search_results(results: list[SearchResult]) -> None:
             str(result.entry.id),
             result.entry.group_name,
             result.entry.description,
-            _render_command(result.entry.command, {}, result.entry.placeholders),
+            _render_command(result.entry.command, params, result.entry.placeholders),
         )
 
     console.print(table)
