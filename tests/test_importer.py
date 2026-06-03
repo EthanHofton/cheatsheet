@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 
 from cheatsheet.importer import CsvRow, SheetFile, bulk_import, bulk_import_file, parse_toml
-from cheatsheet.store import create_sheet, get_entries, get_metadata, get_params
+from cheatsheet.store import create_sheet, get_entries, get_metadata, get_params, get_group
 from cheatsheet.store import DEFAULT_GROUP
 
 
@@ -127,6 +127,55 @@ def test_bulk_import_file_imports_all(conn, mock_embedder):
     assert get_metadata(conn, sheet.id) == {"desc": "my sheet"}
     assert get_params(conn, sheet.id) == {"leader": "Ctrl-A"}
     assert len(get_entries(conn, sheet.id)) == 1
+
+
+def test_parse_toml_with_placeholders(tmp_path):
+    path = write_toml(tmp_path, """
+[[entries]]
+description = "Clone repo"
+command = "git clone <url> <dir>"
+placeholders = [
+  { name = "url", description = "Repository URL" },
+  { name = "dir", description = "Local directory" },
+]
+""")
+    sf = parse_toml(path)
+    assert len(sf.entries) == 1
+    assert len(sf.entries[0].placeholders) == 2
+    assert sf.entries[0].placeholders[0]["name"] == "url"
+    assert sf.entries[0].placeholders[1]["name"] == "dir"
+    assert sf.entries[0].placeholders[0]["description"] == "Repository URL"
+
+
+def test_parse_toml_placeholder_missing_name_raises(tmp_path):
+    path = write_toml(tmp_path, """
+[[entries]]
+description = "Clone repo"
+command = "git clone <url>"
+placeholders = [{ description = "Repository URL" }]
+""")
+    with pytest.raises(ValueError, match="name"):
+        parse_toml(path)
+
+
+def test_bulk_import_stores_placeholders(conn, mock_embedder):
+    sheet = create_sheet(conn, "git")
+    rows = [
+        CsvRow(
+            group=None,
+            description="Clone repo",
+            command="git clone <url> <dir>",
+            placeholders=[
+                {"name": "url", "description": "Repo URL"},
+                {"name": "dir", "description": "Local dir"},
+            ],
+        )
+    ]
+    bulk_import(conn, sheet.id, sheet.name, rows)
+    entries = get_entries(conn, sheet.id)
+    assert len(entries[0].placeholders) == 2
+    assert entries[0].placeholders[0].name == "url"
+    assert entries[0].placeholders[1].name == "dir"
 
 
 def test_bulk_import_file_empty_sheet_file(conn, mock_embedder):

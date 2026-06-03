@@ -3,13 +3,17 @@ import pytest
 from cheatsheet.store import (
     DEFAULT_GROUP,
     add_entry,
+    add_placeholder,
     create_group,
     create_sheet,
+    delete_placeholder,
     delete_sheet,
     get_entries,
     get_group,
+    get_placeholders,
     get_sheet,
     list_sheets,
+    set_placeholders,
     store_embedding,
 )
 
@@ -100,6 +104,86 @@ def test_delete_sheet_removes_embeddings(conn):
 
 def test_delete_sheet_returns_false_for_unknown(conn):
     assert delete_sheet(conn, "nonexistent") is False
+
+
+def test_add_placeholder(conn):
+    sheet = create_sheet(conn, "git")
+    grp = get_group(conn, sheet.id, DEFAULT_GROUP)
+    entry = add_entry(conn, grp.id, "Clone repo", "git clone <url> <dir>")
+    ph = add_placeholder(conn, entry.id, "url", "Repository URL")
+    assert ph.name == "url"
+    assert ph.description == "Repository URL"
+
+
+def test_add_placeholder_duplicate_raises(conn):
+    sheet = create_sheet(conn, "git")
+    grp = get_group(conn, sheet.id, DEFAULT_GROUP)
+    entry = add_entry(conn, grp.id, "Clone", "git clone <url>")
+    add_placeholder(conn, entry.id, "url", "Repository URL")
+    with pytest.raises(ValueError, match="already exists"):
+        add_placeholder(conn, entry.id, "url", "Duplicate")
+
+
+def test_get_placeholders_empty(conn):
+    sheet = create_sheet(conn, "git")
+    grp = get_group(conn, sheet.id, DEFAULT_GROUP)
+    entry = add_entry(conn, grp.id, "Status", "git status")
+    assert get_placeholders(conn, entry.id) == []
+
+
+def test_delete_placeholder(conn):
+    sheet = create_sheet(conn, "git")
+    grp = get_group(conn, sheet.id, DEFAULT_GROUP)
+    entry = add_entry(conn, grp.id, "Clone", "git clone <url>")
+    add_placeholder(conn, entry.id, "url", "Repository URL")
+    delete_placeholder(conn, entry.id, "url")
+    assert get_placeholders(conn, entry.id) == []
+
+
+def test_delete_placeholder_not_found_raises(conn):
+    sheet = create_sheet(conn, "git")
+    grp = get_group(conn, sheet.id, DEFAULT_GROUP)
+    entry = add_entry(conn, grp.id, "Status", "git status")
+    with pytest.raises(ValueError, match="not found"):
+        delete_placeholder(conn, entry.id, "missing")
+
+
+def test_set_placeholders_replaces(conn):
+    sheet = create_sheet(conn, "git")
+    grp = get_group(conn, sheet.id, DEFAULT_GROUP)
+    entry = add_entry(conn, grp.id, "Clone", "git clone <url> <dir>")
+    set_placeholders(conn, entry.id, [
+        {"name": "url", "description": "Repo URL"},
+        {"name": "dir", "description": "Local dir"},
+    ])
+    phs = get_placeholders(conn, entry.id)
+    assert [p.name for p in phs] == ["url", "dir"]
+    set_placeholders(conn, entry.id, [{"name": "url", "description": "Updated"}])
+    phs = get_placeholders(conn, entry.id)
+    assert len(phs) == 1
+    assert phs[0].description == "Updated"
+
+
+def test_get_entries_hydrates_placeholders(conn):
+    sheet = create_sheet(conn, "git")
+    grp = get_group(conn, sheet.id, DEFAULT_GROUP)
+    entry = add_entry(conn, grp.id, "Clone", "git clone <url> <dir>")
+    set_placeholders(conn, entry.id, [
+        {"name": "url", "description": "Repo URL"},
+        {"name": "dir", "description": "Local dir"},
+    ])
+    entries = get_entries(conn, sheet.id)
+    assert len(entries[0].placeholders) == 2
+    assert entries[0].placeholders[0].name == "url"
+    assert entries[0].placeholders[1].name == "dir"
+
+
+def test_get_entries_no_placeholders_returns_empty_list(conn):
+    sheet = create_sheet(conn, "git")
+    grp = get_group(conn, sheet.id, DEFAULT_GROUP)
+    add_entry(conn, grp.id, "Status", "git status")
+    entries = get_entries(conn, sheet.id)
+    assert entries[0].placeholders == []
 
 
 def test_list_sheets_alphabetical_with_counts(conn):

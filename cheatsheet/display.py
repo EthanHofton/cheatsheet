@@ -1,3 +1,4 @@
+import re
 from collections import defaultdict
 
 from rich import box
@@ -6,7 +7,7 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
-from .models import Entry, SearchResult, Sheet
+from .models import Entry, Placeholder, SearchResult, Sheet
 
 console = Console()
 
@@ -16,6 +17,29 @@ DEFAULT_GROUP = "default"
 def _apply_params(text: str, params: dict[str, str]) -> str:
     for key, value in params.items():
         text = text.replace(f"{{{key}}}", value)
+    return text
+
+
+def _render_command(command: str, params: dict[str, str], placeholders: list[Placeholder]) -> Text:
+    cmd = _apply_params(command, params)
+    text = Text(style="bold cyan")
+    last = 0
+    for m in re.finditer(r"<([^>]+)>", cmd):
+        text.append(cmd[last : m.start()])
+        text.append(m.group(0), style="bold magenta")
+        last = m.end()
+    text.append(cmd[last:])
+
+    shown: set[str] = set()
+    for m in re.finditer(r"<([^>]+)>", cmd):
+        name = m.group(1)
+        if name in shown:
+            continue
+        shown.add(name)
+        ph = next((p for p in placeholders if p.name == name), None)
+        if ph and ph.description:
+            text.append(f"\n  {ph.name}  {ph.description}", style="dim")
+
     return text
 
 
@@ -58,7 +82,7 @@ def print_full_sheet(
             table.add_column("Command", style="bold cyan", no_wrap=False)
 
             for e in group_entries:
-                table.add_row(str(e.id), e.description, _apply_params(e.command, params))
+                table.add_row(str(e.id), e.description, _render_command(e.command, params, e.placeholders))
 
             renderables.append(table)
 
@@ -125,7 +149,7 @@ def print_search_results(results: list[SearchResult]) -> None:
             str(result.entry.id),
             result.entry.group_name,
             result.entry.description,
-            result.entry.command,
+            _render_command(result.entry.command, {}, result.entry.placeholders),
         )
 
     console.print(table)
@@ -144,6 +168,18 @@ def print_sheet_list(sheets: list[tuple[Sheet, int]]) -> None:
         table.add_row(sheet.name, str(count))
 
     console.print(table)
+
+
+def print_placeholders(entry_id: int, description: str, placeholders: list[Placeholder]) -> None:
+    if not placeholders:
+        console.print(f"[dim]No placeholders for entry #{entry_id}.[/]")
+        return
+    table = Table(box=box.SIMPLE_HEAD, show_header=True, pad_edge=False)
+    table.add_column("Name", style="bold magenta")
+    table.add_column("Description", style="dim")
+    for ph in placeholders:
+        table.add_row(ph.name, ph.description)
+    console.print(Panel(table, title=f"[bold]#{entry_id}[/] — {description}", expand=False))
 
 
 def print_error(message: str) -> None:

@@ -50,6 +50,17 @@ CREATE TABLE IF NOT EXISTS sheet_metadata (
     value    TEXT NOT NULL,
     UNIQUE(sheet_id, key)
 );
+
+CREATE TABLE IF NOT EXISTS entry_placeholders (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    entry_id    INTEGER NOT NULL REFERENCES entries(id) ON DELETE CASCADE,
+    name        TEXT NOT NULL,
+    description TEXT NOT NULL DEFAULT '',
+    position    INTEGER NOT NULL DEFAULT 0,
+    UNIQUE(entry_id, name)
+);
+
+CREATE INDEX IF NOT EXISTS idx_entry_placeholders_entry_id ON entry_placeholders(entry_id);
 """
 
 

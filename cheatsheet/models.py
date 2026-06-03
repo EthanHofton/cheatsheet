@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass
@@ -17,6 +17,12 @@ class Group:
 
 
 @dataclass
+class Placeholder:
+    name: str
+    description: str
+
+
+@dataclass
 class Entry:
     id: int
     group_id: int
@@ -25,6 +31,7 @@ class Entry:
     description: str
     command: str
     created_at: str
+    placeholders: list[Placeholder] = field(default_factory=list)
 
 
 @dataclass

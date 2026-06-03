@@ -30,24 +30,45 @@ cheatsheet tmux --group window
 
 ```toml
 [metadata]
-desc = "Tmux keybinding reference"
+desc = "Git reference"
+author = "Ethan"
 
 [params]
-leader = "Ctrl-A"
+remote = "origin"
 
 [[entries]]
-group = "pane"
-description = "Close current pane"
-command = "{leader} x"
+group = "remote"
+description = "Clone a repo into a directory"
+command = "git clone <url> <dir>"
+placeholders = [
+  { name = "url", description = "Repository URL to clone" },
+  { name = "dir", description = "Local directory name" },
+]
 
 [[entries]]
-description = "New window"
-command = "{leader} c"
+group = "remote"
+description = "Push a branch"
+command = "git push {remote} <branch>"
+placeholders = [
+  { name = "branch", description = "Branch to push" },
+]
+
+[[entries]]
+group = "local"
+description = "Show status"
+command = "git status"
 ```
 
-All three sections are optional. Entries without a `group` go into the default group. Groups are created automatically.
+All three top-level sections are optional. Entries without a `group` go into the default group. Groups are created automatically.
 
-Params are substituted at display time — `{leader} x` renders as `Ctrl-A x`.
+### Two placeholder syntaxes
+
+| Syntax | Scope | Behaviour |
+|---|---|---|
+| `{param}` | Sheet-level | Substituted at display time with a stored value (e.g. `{remote}` → `origin`) |
+| `<placeholder>` | Entry-level | Highlighted to signal a value the user must supply; optional description per placeholder |
+
+Both can appear in the same command: `git push {remote} <branch>` renders as `git push origin <branch>` with `<branch>` highlighted.
 
 ## Commands
 
@@ -82,6 +103,16 @@ cheatsheet <name> entry update <id> --description "New desc"
 cheatsheet <name> entry update <id> --command "new cmd" --group <group>
 cheatsheet <name> entry delete <id>
 ```
+
+### Entry placeholders
+
+```bash
+cheatsheet <name> entry placeholder list <id>
+cheatsheet <name> entry placeholder add <id> <name> "<description>"
+cheatsheet <name> entry placeholder delete <id> <name>
+```
+
+Placeholders added via the CLI are stored and displayed alongside the entry. The `<name>` token in the command is highlighted automatically — the `placeholder add` command just attaches a description to it.
 
 ### Groups
 

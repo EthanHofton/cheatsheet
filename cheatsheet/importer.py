@@ -10,6 +10,7 @@ class CsvRow:
     group: str | None
     description: str
     command: str
+    placeholders: list[dict] = field(default_factory=list)
 
 
 @dataclass
@@ -61,7 +62,7 @@ def bulk_import(
 
 
 def _do_insert(conn, sheet_id, rows, embed_fn, store_embedding_fn, progress, task):
-    from .store import get_group, add_entry
+    from .store import get_group, add_entry, set_placeholders
 
     count = 0
     for row in rows:
@@ -70,6 +71,8 @@ def _do_insert(conn, sheet_id, rows, embed_fn, store_embedding_fn, progress, tas
         if group is None:
             continue
         entry = add_entry(conn, group.id, row.description, row.command)
+        if row.placeholders:
+            set_placeholders(conn, entry.id, row.placeholders)
         vector = embed_fn(f"{row.description} {row.command}")
         store_embedding_fn(conn, entry.id, vector)
         count += 1
@@ -97,10 +100,19 @@ def parse_toml(path: Path) -> SheetFile:
         cmd = str(row["command"]).strip()
         if not desc or not cmd:
             raise ValueError(f"Entry {i}: 'description' and 'command' must not be empty.")
+        placeholders = []
+        for j, ph in enumerate(row.get("placeholders", []), start=1):
+            if "name" not in ph:
+                raise ValueError(f"Entry {i} placeholder {j} missing required field 'name'.")
+            placeholders.append({
+                "name": str(ph["name"]),
+                "description": str(ph.get("description", "")),
+            })
         entries.append(CsvRow(
             group=str(row.get("group", "")).strip() or None,
             description=desc,
             command=cmd,
+            placeholders=placeholders,
         ))
 
     return SheetFile(metadata=metadata, params=params, entries=entries)

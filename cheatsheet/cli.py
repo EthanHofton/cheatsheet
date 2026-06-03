@@ -7,6 +7,7 @@ from .display import (
     print_full_sheet,
     print_kv_table,
     print_metadata_only,
+    print_placeholders,
     print_search_results,
     print_sheet_list,
     print_success,
@@ -16,11 +17,13 @@ from .store import (
     add_entry,
     add_metadata,
     add_param,
+    add_placeholder,
     create_group,
     create_sheet,
     delete_entry,
     delete_metadata,
     delete_param,
+    delete_placeholder,
     delete_sheet,
     edit_metadata,
     edit_param,
@@ -28,6 +31,7 @@ from .store import (
     get_group,
     get_metadata,
     get_params,
+    get_placeholders,
     get_sheet,
     list_groups,
     list_sheets,
@@ -84,32 +88,41 @@ def new_cmd(sheet_name, toml_path):
 
     \b
     [metadata]   — free-form key/value info shown at the top of the sheet
-    [params]     — named placeholders substituted into commands at display time
+    [params]     — sheet-level values substituted into commands at display time (e.g. {leader})
     [[entries]]  — one block per entry; repeat as many times as needed
 
     \b
     TOML example:
       [metadata]
-      desc = "Tmux keybinding reference"
+      desc = "Git reference"
       [params]
-      leader = "Ctrl-A"
+      remote = "origin"
       [[entries]]
-      group = "pane"
-      description = "Kill pane"
-      command = "{leader} x"
+      group = "remote"
+      description = "Clone a repo"
+      command = "git clone <url> <dir>"
+      placeholders = [
+        { name = "url", description = "Repository URL" },
+        { name = "dir", description = "Local directory name" },
+      ]
       [[entries]]
-      description = "New window"
-      command = "{leader} c"
+      description = "Push branch"
+      command = "git push {remote} <branch>"
 
     Each [[entries]] block requires 'description' and 'command'. The 'group'
     field is optional — entries without one go into the default group. Groups
     are created automatically; no need to pre-create them.
 
     \b
+    Two placeholder syntaxes serve different purposes:
+      {param}       — sheet-level, substituted at display time (e.g. {remote} → origin)
+      <placeholder> — entry-level, marks values the user must supply (e.g. <branch>)
+
+    \b
     Param substitution:
-      Define  →  cheatsheet tmux params add leader "Ctrl-A"
-      Use     →  command = "{leader} x"   (stored literally)
-      Display →  Ctrl-A x                 (substituted at render time)
+      Define  →  cheatsheet git params add remote "origin"
+      Use     →  command = "git push {remote} <branch>"
+      Display →  git push origin <branch>   (param substituted; placeholder highlighted)
     """
     with get_connection() as conn:
         try:
@@ -334,6 +347,80 @@ def entry_delete(ctx, entry_id, yes):
             click.confirm(f"Delete entry #{entry_id} ('{entry.description}')?", abort=True)
         delete_entry(conn, entry_id)
     print_success(f"Deleted entry #{entry_id}.")
+
+
+# ---------------------------------------------------------------------------
+# cheatsheet tmux entry placeholder [add / delete / list]
+# ---------------------------------------------------------------------------
+
+@entry_group.group("placeholder")
+def placeholder_group():
+    """Manage placeholders for an entry."""
+    pass
+
+
+@placeholder_group.command("add")
+@click.argument("entry_id", type=int)
+@click.argument("name")
+@click.argument("description", default="")
+@click.pass_context
+def placeholder_add(ctx, entry_id, name, description):
+    """Add a placeholder to an entry.
+
+    \b
+    Example:
+      cheatsheet git entry placeholder add 5 url "Repository URL to clone"
+    """
+    sheet_name = ctx.obj
+    with get_connection() as conn:
+        entry = get_entry_by_id(conn, entry_id)
+        if entry is None or entry.sheet_name != sheet_name:
+            print_error(f"Entry #{entry_id} not found in '{sheet_name}'.")
+            raise SystemExit(1)
+        try:
+            add_placeholder(conn, entry_id, name, description)
+        except ValueError as e:
+            print_error(str(e))
+            raise SystemExit(1)
+    print_success(f"Added placeholder '{name}' to entry #{entry_id}.")
+
+
+@placeholder_group.command("delete")
+@click.argument("entry_id", type=int)
+@click.argument("name")
+@click.option("--yes", "-y", is_flag=True, help="Skip confirmation prompt.")
+@click.pass_context
+def placeholder_delete(ctx, entry_id, name, yes):
+    """Delete a placeholder from an entry."""
+    sheet_name = ctx.obj
+    with get_connection() as conn:
+        entry = get_entry_by_id(conn, entry_id)
+        if entry is None or entry.sheet_name != sheet_name:
+            print_error(f"Entry #{entry_id} not found in '{sheet_name}'.")
+            raise SystemExit(1)
+        if not yes:
+            click.confirm(f"Delete placeholder '{name}' from entry #{entry_id}?", abort=True)
+        try:
+            delete_placeholder(conn, entry_id, name)
+        except ValueError as e:
+            print_error(str(e))
+            raise SystemExit(1)
+    print_success(f"Deleted placeholder '{name}' from entry #{entry_id}.")
+
+
+@placeholder_group.command("list")
+@click.argument("entry_id", type=int)
+@click.pass_context
+def placeholder_list(ctx, entry_id):
+    """List placeholders for an entry."""
+    sheet_name = ctx.obj
+    with get_connection() as conn:
+        entry = get_entry_by_id(conn, entry_id)
+        if entry is None or entry.sheet_name != sheet_name:
+            print_error(f"Entry #{entry_id} not found in '{sheet_name}'.")
+            raise SystemExit(1)
+        placeholders = get_placeholders(conn, entry_id)
+    print_placeholders(entry_id, entry.description, placeholders)
 
 
 # ---------------------------------------------------------------------------

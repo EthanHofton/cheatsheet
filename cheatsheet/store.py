@@ -3,7 +3,7 @@ import struct
 from typing import Optional
 
 
-from .models import Entry, Group, Sheet
+from .models import Entry, Group, Placeholder, Sheet
 
 DEFAULT_GROUP = "default"
 RESERVED_NAMES = frozenset({"show", "new", "list", "delete"})
@@ -187,7 +187,7 @@ def get_entry_by_id(conn: sqlite3.Connection, entry_id: int) -> Optional[Entry]:
     ).fetchone()
     if row is None:
         return None
-    return Entry(
+    entry = Entry(
         id=row["id"],
         group_id=row["group_id"],
         group_name=row["group_name"],
@@ -196,6 +196,8 @@ def get_entry_by_id(conn: sqlite3.Connection, entry_id: int) -> Optional[Entry]:
         command=row["command"],
         created_at=row["created_at"],
     )
+    _hydrate_placeholders(conn, [entry])
+    return entry
 
 
 def delete_entry(conn: sqlite3.Connection, entry_id: int) -> bool:
@@ -256,7 +258,7 @@ def get_entries(
             """,
             [sheet_id],
         ).fetchall()
-    return [
+    entries = [
         Entry(
             id=r["id"],
             group_id=r["group_id"],
@@ -268,6 +270,26 @@ def get_entries(
         )
         for r in rows
     ]
+    _hydrate_placeholders(conn, entries)
+    return entries
+
+
+def _hydrate_placeholders(conn: sqlite3.Connection, entries: list[Entry]) -> None:
+    if not entries:
+        return
+    ids = [e.id for e in entries]
+    ph_rows = conn.execute(
+        f"SELECT entry_id, name, description FROM entry_placeholders "
+        f"WHERE entry_id IN ({','.join('?' * len(ids))}) ORDER BY entry_id, position",
+        ids,
+    ).fetchall()
+    by_entry: dict[int, list[Placeholder]] = {}
+    for row in ph_rows:
+        by_entry.setdefault(row["entry_id"], []).append(
+            Placeholder(name=row["name"], description=row["description"])
+        )
+    for entry in entries:
+        entry.placeholders = by_entry.get(entry.id, [])
 
 
 # ---------------------------------------------------------------------------
@@ -317,6 +339,65 @@ def get_params(conn: sqlite3.Connection, sheet_id: int) -> dict[str, str]:
 # ---------------------------------------------------------------------------
 # Metadata
 # ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Placeholders
+# ---------------------------------------------------------------------------
+
+
+def add_placeholder(
+    conn: sqlite3.Connection, entry_id: int, name: str, description: str
+) -> Placeholder:
+    row = conn.execute(
+        "SELECT COALESCE(MAX(position) + 1, 0) AS next_pos FROM entry_placeholders WHERE entry_id = ?",
+        [entry_id],
+    ).fetchone()
+    position = row["next_pos"]
+    try:
+        conn.execute(
+            "INSERT INTO entry_placeholders (entry_id, name, description, position) VALUES (?, ?, ?, ?)",
+            [entry_id, name, description, position],
+        )
+        conn.commit()
+    except sqlite3.IntegrityError:
+        raise ValueError(f"Placeholder '{name}' already exists for this entry.")
+    return Placeholder(name=name, description=description)
+
+
+def delete_placeholder(conn: sqlite3.Connection, entry_id: int, name: str) -> None:
+    cur = conn.execute(
+        "DELETE FROM entry_placeholders WHERE entry_id = ? AND name = ?",
+        [entry_id, name],
+    )
+    conn.commit()
+    if cur.rowcount == 0:
+        raise ValueError(f"Placeholder '{name}' not found.")
+
+
+def get_placeholders(conn: sqlite3.Connection, entry_id: int) -> list[Placeholder]:
+    rows = conn.execute(
+        "SELECT name, description FROM entry_placeholders WHERE entry_id = ? ORDER BY position",
+        [entry_id],
+    ).fetchall()
+    return [Placeholder(name=r["name"], description=r["description"]) for r in rows]
+
+
+def set_placeholders(
+    conn: sqlite3.Connection, entry_id: int, placeholders: list[dict]
+) -> None:
+    conn.execute("DELETE FROM entry_placeholders WHERE entry_id = ?", [entry_id])
+    for i, ph in enumerate(placeholders):
+        conn.execute(
+            "INSERT INTO entry_placeholders (entry_id, name, description, position) VALUES (?, ?, ?, ?)",
+            [entry_id, ph["name"], ph.get("description", ""), i],
+        )
+    conn.commit()
+
+
+# ---------------------------------------------------------------------------
+# Metadata
+# ---------------------------------------------------------------------------
+
 
 def add_metadata(conn: sqlite3.Connection, sheet_id: int, key: str, value: str) -> None:
     _kv_add(conn, "sheet_metadata", sheet_id, key, value)
