@@ -12,6 +12,8 @@ def semantic_search(
     sheet_name: str,
     query: str,
     top_k: int = 8,
+    tol: float | None = None,
+    filter_group: str | None = None,
 ) -> list[SearchResult]:
     sheet = get_sheet(conn, sheet_name)
     if sheet is None:
@@ -25,19 +27,26 @@ def semantic_search(
     entry_ids = [eid for eid, _ in embeddings]
     matrix = np.array([vec for _, vec in embeddings], dtype=np.float32)
 
-    # Embeddings are already L2-normalised; dot product == cosine similarity.
+    # Embeddings are L2-normalised; dot product == cosine similarity.
     similarities = matrix @ query_vec
     distances = 1.0 - similarities
 
-    order = np.argsort(distances)[:top_k]
-
+    order = np.argsort(distances)
     entries_by_id = {e.id: e for e in get_entries(conn, sheet.id)}
 
     results = []
     for idx in order:
+        if len(results) == top_k:
+            break
         entry_id = entry_ids[idx]
         entry = entries_by_id.get(entry_id)
-        if entry is not None:
-            results.append(SearchResult(entry=entry, distance=float(distances[idx])))
+        if entry is None:
+            continue
+        distance = float(distances[idx])
+        if tol is not None and (1.0 - distance) < tol:
+            continue
+        if filter_group is not None and entry.group_name != filter_group:
+            continue
+        results.append(SearchResult(entry=entry, distance=distance))
 
     return results

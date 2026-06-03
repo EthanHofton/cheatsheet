@@ -6,4 +6,3 @@ dist/
 .pytest_cache/
 .coverage
 htmlcov/
-examples/

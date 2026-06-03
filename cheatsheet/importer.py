@@ -1,8 +1,6 @@
-import csv
 import sqlite3
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Iterator
 
 DEFAULT_GROUP = "default"
 
@@ -14,28 +12,11 @@ class CsvRow:
     command: str
 
 
-def parse_csv(path: Path) -> list[CsvRow]:
-    rows: list[CsvRow] = []
-    with open(path, encoding="utf-8-sig", newline="") as f:
-        reader = csv.DictReader(f)
-        if reader.fieldnames is None:
-            raise ValueError("CSV file is empty.")
-
-        normalised = {h.strip().lower() for h in reader.fieldnames}
-        if "description" not in normalised or "command" not in normalised:
-            raise ValueError("CSV must have 'description' and 'command' headers.")
-
-        for i, raw in enumerate(reader, start=2):
-            desc = raw.get("description", "").strip()
-            cmd = raw.get("command", "").strip()
-            grp = raw.get("group", "").strip() or None
-
-            if not desc or not cmd:
-                raise ValueError(f"Row {i}: 'description' and 'command' must not be empty.")
-
-            rows.append(CsvRow(group=grp, description=desc, command=cmd))
-
-    return rows
+@dataclass
+class SheetFile:
+    metadata: dict[str, str] = field(default_factory=dict)
+    params: dict[str, str] = field(default_factory=dict)
+    entries: list[CsvRow] = field(default_factory=list)
 
 
 def bulk_import(
@@ -95,3 +76,56 @@ def _do_insert(conn, sheet_id, rows, embed_fn, store_embedding_fn, progress, tas
         if progress is not None and task is not None:
             progress.advance(task)
     return count
+
+
+def parse_toml(path: Path) -> SheetFile:
+    import tomllib
+
+    with open(path, "rb") as f:
+        data = tomllib.load(f)
+
+    metadata = {k: str(v) for k, v in data.get("metadata", {}).items()}
+    params = {k: str(v) for k, v in data.get("params", {}).items()}
+
+    entries: list[CsvRow] = []
+    for i, row in enumerate(data.get("entries", []), start=1):
+        if "description" not in row:
+            raise ValueError(f"Entry {i} missing required field 'description'.")
+        if "command" not in row:
+            raise ValueError(f"Entry {i} missing required field 'command'.")
+        desc = str(row["description"]).strip()
+        cmd = str(row["command"]).strip()
+        if not desc or not cmd:
+            raise ValueError(f"Entry {i}: 'description' and 'command' must not be empty.")
+        entries.append(CsvRow(
+            group=str(row.get("group", "")).strip() or None,
+            description=desc,
+            command=cmd,
+        ))
+
+    return SheetFile(metadata=metadata, params=params, entries=entries)
+
+
+def bulk_import_file(
+    conn: sqlite3.Connection,
+    sheet_id: int,
+    sheet_name: str,
+    sheet_file: SheetFile,
+    embed_fn=None,
+    store_embedding_fn=None,
+) -> tuple[int, int, int]:
+    from .store import add_metadata, add_param
+
+    for k, v in sheet_file.metadata.items():
+        add_metadata(conn, sheet_id, k, v)
+
+    for k, v in sheet_file.params.items():
+        add_param(conn, sheet_id, k, v)
+
+    entry_count = 0
+    if sheet_file.entries:
+        entry_count = bulk_import(
+            conn, sheet_id, sheet_name, sheet_file.entries, embed_fn, store_embedding_fn
+        )
+
+    return len(sheet_file.metadata), len(sheet_file.params), entry_count

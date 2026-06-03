@@ -29,7 +29,7 @@ def test_create_sheet_errors_on_duplicate(conn):
 
 def test_create_sheet_errors_on_reserved_name(conn):
     with pytest.raises(ValueError, match="reserved"):
-        create_sheet(conn, "add")
+        create_sheet(conn, "list")
 
 
 def test_create_group_unique_constraint(conn):

@@ -34,6 +34,22 @@ CREATE TABLE IF NOT EXISTS entry_embeddings (
     entry_id  INTEGER PRIMARY KEY REFERENCES entries(id) ON DELETE CASCADE,
     embedding BLOB NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS sheet_params (
+    id       INTEGER PRIMARY KEY AUTOINCREMENT,
+    sheet_id INTEGER NOT NULL REFERENCES sheets(id) ON DELETE CASCADE,
+    key      TEXT NOT NULL,
+    value    TEXT NOT NULL,
+    UNIQUE(sheet_id, key)
+);
+
+CREATE TABLE IF NOT EXISTS sheet_metadata (
+    id       INTEGER PRIMARY KEY AUTOINCREMENT,
+    sheet_id INTEGER NOT NULL REFERENCES sheets(id) ON DELETE CASCADE,
+    key      TEXT NOT NULL,
+    value    TEXT NOT NULL,
+    UNIQUE(sheet_id, key)
+);
 """
 
 

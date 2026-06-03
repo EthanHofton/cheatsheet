@@ -1,0 +1,247 @@
+[metadata]
+desc = "Tmux keybinding reference"
+author = "Ethan"
+
+[params]
+leader = "Ctrl-A"
+
+[[entries]]
+group = "pane"
+description = "Split vertically (side by side)"
+command = "{leader} |"
+[[entries]]
+group = "pane"
+description = "Split horizontally (top/bottom)"
+command = "{leader} -"
+[[entries]]
+group = "pane"
+description = "Move pane focus left (vim-tmux-navigator)"
+command = "Ctrl-H"
+[[entries]]
+group = "pane"
+description = "Move pane focus down (vim-tmux-navigator)"
+command = "Ctrl-J"
+[[entries]]
+group = "pane"
+description = "Move pane focus up (vim-tmux-navigator)"
+command = "Ctrl-K"
+[[entries]]
+group = "pane"
+description = "Move pane focus right (vim-tmux-navigator)"
+command = "Ctrl-L"
+[[entries]]
+group = "pane"
+description = "Move pane focus left (default)"
+command = "{leader} left"
+[[entries]]
+group = "pane"
+description = "Move pane focus down (default)"
+command = "{leader} down"
+[[entries]]
+group = "pane"
+description = "Move pane focus up (default)"
+command = "{leader} up"
+[[entries]]
+group = "pane"
+description = "Move pane focus right (default)"
+command = "{leader} right"
+[[entries]]
+group = "pane"
+description = "Flash pane numbers and jump"
+command = "{leader} q"
+[[entries]]
+group = "pane"
+description = "Cycle through panes"
+command = "{leader} o"
+[[entries]]
+group = "pane"
+description = "Zoom pane fullscreen"
+command = "{leader} z"
+[[entries]]
+group = "pane"
+description = "Swap pane with previous"
+command = "{leader} {"
+[[entries]]
+group = "pane"
+description = "Swap pane with next"
+command = "{leader} }"
+[[entries]]
+group = "pane"
+description = "Cycle through pane layouts"
+command = "{leader} Space"
+[[entries]]
+group = "pane"
+description = "Break pane into its own window"
+command = "{leader} !"
+[[entries]]
+group = "pane"
+description = "Close current pane"
+command = "{leader} x"
+[[entries]]
+group = "pane"
+description = "Resize pane up"
+command = "{leader} Ctrl-up"
+[[entries]]
+group = "pane"
+description = "Resize pane down"
+command = "{leader} Ctrl-down"
+[[entries]]
+group = "pane"
+description = "Resize pane left"
+command = "{leader} Ctrl-left"
+[[entries]]
+group = "pane"
+description = "Resize pane right"
+command = "{leader} Ctrl-right"
+[[entries]]
+group = "window"
+description = "Create new window"
+command = "{leader} c"
+[[entries]]
+group = "window"
+description = "Next window"
+command = "{leader} n"
+[[entries]]
+group = "window"
+description = "Previous window"
+command = "{leader} p"
+[[entries]]
+group = "window"
+description = "Jump to window n"
+command = "{leader} [n]"
+[[entries]]
+group = "window"
+description = "Interactive window list"
+command = "{leader} w"
+[[entries]]
+group = "window"
+description = "Rename current window"
+command = "{leader} ,"
+[[entries]]
+group = "window"
+description = "Kill current window"
+command = "{leader} &"
+[[entries]]
+group = "window"
+description = "Jump to last used window"
+command = "{leader} l"
+[[entries]]
+group = "session"
+description = "Detach from session"
+command = "{leader} d"
+[[entries]]
+group = "session"
+description = "Rename current session"
+command = "{leader} $"
+[[entries]]
+group = "session"
+description = "Interactive session switcher"
+command = "{leader} s"
+[[entries]]
+group = "session"
+description = "Switch to previous session"
+command = "{leader} ("
+[[entries]]
+group = "session"
+description = "Switch to next session"
+command = "{leader} )"
+[[entries]]
+group = "session"
+description = "Create named session"
+command = "tmux new -s <name>"
+[[entries]]
+group = "session"
+description = "Create grouped session"
+command = "tmux new-session -t <source> -s <name>"
+[[entries]]
+group = "session"
+description = "Attach to session"
+command = "tmux attach -t <name>"
+[[entries]]
+group = "session"
+description = "List sessions"
+command = "tmux ls"
+[[entries]]
+group = "copy"
+description = "Enter copy/scroll mode"
+command = "{leader} ["
+[[entries]]
+group = "copy"
+description = "Exit copy mode"
+command = "q"
+[[entries]]
+group = "copy"
+description = "Scroll down"
+command = "j"
+[[entries]]
+group = "copy"
+description = "Scroll up"
+command = "k"
+[[entries]]
+group = "copy"
+description = "Half-page down"
+command = "Ctrl-D"
+[[entries]]
+group = "copy"
+description = "Half-page up"
+command = "Ctrl-U"
+[[entries]]
+group = "copy"
+description = "Full page down"
+command = "Ctrl-F"
+[[entries]]
+group = "copy"
+description = "Full page up"
+command = "Ctrl-B"
+[[entries]]
+group = "copy"
+description = "Jump to top"
+command = "g"
+[[entries]]
+group = "copy"
+description = "Jump to bottom"
+command = "G"
+[[entries]]
+group = "copy"
+description = "Search forward"
+command = "/"
+[[entries]]
+group = "copy"
+description = "Search backward"
+command = "?"
+[[entries]]
+group = "copy"
+description = "Next search result"
+command = "n"
+[[entries]]
+group = "copy"
+description = "Previous search result"
+command = "N"
+[[entries]]
+group = "copy"
+description = "Start selection"
+command = "Space"
+[[entries]]
+group = "copy"
+description = "Copy selection and exit"
+command = "Enter"
+[[entries]]
+group = "copy"
+description = "Paste copied text"
+command = "{leader} ]"
+[[entries]]
+group = "misc"
+description = "Show all keybindings"
+command = "{leader} ?"
+[[entries]]
+group = "misc"
+description = "Open command prompt"
+command = "{leader} :"
+[[entries]]
+group = "misc"
+description = "Show clock"
+command = "{leader} t"
+[[entries]]
+group = "misc"
+description = "Show tmux messages"
+command = "{leader} ~"

@@ -50,12 +50,12 @@ def test_print_full_sheet_empty():
 def test_print_search_results_shows_score():
     entry = make_entry(1, "pane", "Kill pane", "Ctrl+B x")
     results = [SearchResult(entry=entry, distance=0.1)]
-    output = capture(print_search_results, "tmux", "kill", results)
+    output = capture(print_search_results, results)
     assert "0.90" in output
 
 
 def test_print_search_results_empty():
-    output = capture(print_search_results, "tmux", "kill", [])
+    output = capture(print_search_results, [])
     assert "No results" in output
 
 

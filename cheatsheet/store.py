@@ -6,7 +6,7 @@ from typing import Optional
 from .models import Entry, Group, Sheet
 
 DEFAULT_GROUP = "default"
-RESERVED_NAMES = frozenset({"show", "new", "group", "add", "list", "delete"})
+RESERVED_NAMES = frozenset({"show", "new", "list", "delete"})
 
 
 # ---------------------------------------------------------------------------
@@ -173,6 +173,58 @@ def load_embeddings(conn: sqlite3.Connection, sheet_id: int) -> list[tuple[int, 
     return result
 
 
+def get_entry_by_id(conn: sqlite3.Connection, entry_id: int) -> Optional[Entry]:
+    row = conn.execute(
+        """
+        SELECT e.id, e.group_id, g.name AS group_name, s.name AS sheet_name,
+               e.description, e.command, e.created_at
+        FROM entries e
+        JOIN groups g ON g.id = e.group_id
+        JOIN sheets s ON s.id = g.sheet_id
+        WHERE e.id = ?
+        """,
+        [entry_id],
+    ).fetchone()
+    if row is None:
+        return None
+    return Entry(
+        id=row["id"],
+        group_id=row["group_id"],
+        group_name=row["group_name"],
+        sheet_name=row["sheet_name"],
+        description=row["description"],
+        command=row["command"],
+        created_at=row["created_at"],
+    )
+
+
+def delete_entry(conn: sqlite3.Connection, entry_id: int) -> bool:
+    conn.execute("DELETE FROM entry_embeddings WHERE entry_id = ?", [entry_id])
+    cur = conn.execute("DELETE FROM entries WHERE id = ?", [entry_id])
+    conn.commit()
+    return cur.rowcount > 0
+
+
+def update_entry(
+    conn: sqlite3.Connection,
+    entry_id: int,
+    description: Optional[str] = None,
+    command: Optional[str] = None,
+    group_id: Optional[int] = None,
+) -> Entry:
+    if description is not None:
+        conn.execute("UPDATE entries SET description = ? WHERE id = ?", [description, entry_id])
+    if command is not None:
+        conn.execute("UPDATE entries SET command = ? WHERE id = ?", [command, entry_id])
+    if group_id is not None:
+        conn.execute("UPDATE entries SET group_id = ? WHERE id = ?", [group_id, entry_id])
+    conn.commit()
+    entry = get_entry_by_id(conn, entry_id)
+    if entry is None:
+        raise ValueError(f"Entry {entry_id} not found after update.")
+    return entry
+
+
 def get_entries(
     conn: sqlite3.Connection,
     sheet_id: int,
@@ -216,3 +268,64 @@ def get_entries(
         )
         for r in rows
     ]
+
+
+# ---------------------------------------------------------------------------
+# Params
+# ---------------------------------------------------------------------------
+
+def _kv_add(conn: sqlite3.Connection, table: str, sheet_id: int, key: str, value: str) -> None:
+    try:
+        conn.execute(f"INSERT INTO {table} (sheet_id, key, value) VALUES (?, ?, ?)", [sheet_id, key, value])
+        conn.commit()
+    except sqlite3.IntegrityError:
+        raise ValueError(f"'{key}' already exists. Use edit to change it.")
+
+
+def _kv_edit(conn: sqlite3.Connection, table: str, sheet_id: int, key: str, value: str) -> None:
+    cur = conn.execute(f"UPDATE {table} SET value = ? WHERE sheet_id = ? AND key = ?", [value, sheet_id, key])
+    conn.commit()
+    if cur.rowcount == 0:
+        raise ValueError(f"'{key}' not found. Use add to create it.")
+
+
+def _kv_delete(conn: sqlite3.Connection, table: str, sheet_id: int, key: str) -> None:
+    cur = conn.execute(f"DELETE FROM {table} WHERE sheet_id = ? AND key = ?", [sheet_id, key])
+    conn.commit()
+    if cur.rowcount == 0:
+        raise ValueError(f"'{key}' not found.")
+
+
+def _kv_get_all(conn: sqlite3.Connection, table: str, sheet_id: int) -> dict[str, str]:
+    rows = conn.execute(f"SELECT key, value FROM {table} WHERE sheet_id = ? ORDER BY key", [sheet_id]).fetchall()
+    return {r["key"]: r["value"] for r in rows}
+
+
+def add_param(conn: sqlite3.Connection, sheet_id: int, key: str, value: str) -> None:
+    _kv_add(conn, "sheet_params", sheet_id, key, value)
+
+def edit_param(conn: sqlite3.Connection, sheet_id: int, key: str, value: str) -> None:
+    _kv_edit(conn, "sheet_params", sheet_id, key, value)
+
+def delete_param(conn: sqlite3.Connection, sheet_id: int, key: str) -> None:
+    _kv_delete(conn, "sheet_params", sheet_id, key)
+
+def get_params(conn: sqlite3.Connection, sheet_id: int) -> dict[str, str]:
+    return _kv_get_all(conn, "sheet_params", sheet_id)
+
+
+# ---------------------------------------------------------------------------
+# Metadata
+# ---------------------------------------------------------------------------
+
+def add_metadata(conn: sqlite3.Connection, sheet_id: int, key: str, value: str) -> None:
+    _kv_add(conn, "sheet_metadata", sheet_id, key, value)
+
+def edit_metadata(conn: sqlite3.Connection, sheet_id: int, key: str, value: str) -> None:
+    _kv_edit(conn, "sheet_metadata", sheet_id, key, value)
+
+def delete_metadata(conn: sqlite3.Connection, sheet_id: int, key: str) -> None:
+    _kv_delete(conn, "sheet_metadata", sheet_id, key)
+
+def get_metadata(conn: sqlite3.Connection, sheet_id: int) -> dict[str, str]:
+    return _kv_get_all(conn, "sheet_metadata", sheet_id)
