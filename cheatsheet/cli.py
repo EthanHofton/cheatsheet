@@ -216,6 +216,49 @@ def _require_sheet(conn, sheet_name: str):
 
 
 # ---------------------------------------------------------------------------
+# cheatsheet tmux reindex
+# ---------------------------------------------------------------------------
+
+@show_cmd.command("reindex")
+@click.pass_context
+def reindex_cmd(ctx):
+    """Re-embed all entries using group, description, command, and placeholder text.
+
+    Run this after bulk-importing a sheet or after changing group names, so that
+    semantic search reflects the full context of every entry.
+    """
+    from rich.status import Status
+    from .embeddings import embed_batch, entry_embed_text
+
+    sheet_name = ctx.obj
+    with get_connection() as conn:
+        sheet = _require_sheet(conn, sheet_name)
+        from .store import get_entries
+        entries = get_entries(conn, sheet.id)
+        if not entries:
+            console.print(f"[dim]No entries in '{sheet_name}' to reindex.[/]")
+            return
+
+        texts = [
+            entry_embed_text(
+                e.group_name,
+                e.description,
+                e.command,
+                [ph.description for ph in e.placeholders],
+            )
+            for e in entries
+        ]
+
+        with Status(f"[dim]Embedding {len(entries)} entries…[/]", console=console):
+            vectors = embed_batch(texts)
+
+        for entry, vector in zip(entries, vectors):
+            store_embedding(conn, entry.id, vector)
+
+    print_success(f"Reindexed {len(entries)} entries in '{sheet_name}'.")
+
+
+# ---------------------------------------------------------------------------
 # cheatsheet tmux query
 # ---------------------------------------------------------------------------
 
@@ -325,9 +368,14 @@ def entry_update(ctx, entry_id, description, command, group):
                                command=command, group_id=new_group_id)
 
         if description is not None or command is not None:
-            from .embeddings import embed
+            from .embeddings import embed, entry_embed_text
             with Status("[dim]Re-embedding…[/]", console=console):
-                vector = embed(f"{updated.description} {updated.command}")
+                vector = embed(entry_embed_text(
+                    updated.group_name,
+                    updated.description,
+                    updated.command,
+                    [ph.description for ph in updated.placeholders],
+                ))
             store_embedding(conn, entry_id, vector)
 
     print_success(f"Updated entry #{entry_id}.")
@@ -651,16 +699,16 @@ def _resolve_group(conn, sheet, group_name: str | None):
 
 
 def _single_add(conn, sheet, description: str, command: str, group_name: str | None):
-    from .embeddings import embed
+    from .embeddings import embed, entry_embed_text
     grp = _resolve_group(conn, sheet, group_name)
     entry = add_entry(conn, grp.id, description, command)
-    vector = embed(f"{description} {command}")
+    vector = embed(entry_embed_text(grp.name, description, command))
     store_embedding(conn, entry.id, vector)
     print_success(f"Added '{description}' → {sheet.name}/{grp.name} (#{entry.id})")
 
 
 def _interactive_add(conn, sheet):
-    from .embeddings import embed
+    from .embeddings import embed, entry_embed_text
     params = get_params(conn, sheet.id)
     click.echo(f"Adding entries to '{sheet.name}'. Leave description blank to finish.\n")
     if params:
@@ -681,7 +729,7 @@ def _interactive_add(conn, sheet):
                 click.echo(f"  ! {e.format_message()}")
                 continue
             entry = add_entry(conn, grp.id, description.strip(), command.strip())
-            vector = embed(f"{description} {command}")
+            vector = embed(entry_embed_text(grp.name, description.strip(), command.strip()))
             store_embedding(conn, entry.id, vector)
             print_success(f"Added '{description}' → {sheet.name}/{grp.name} (#{entry.id})")
             click.echo()

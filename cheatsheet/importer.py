@@ -73,7 +73,14 @@ def _do_insert(conn, sheet_id, rows, embed_fn, store_embedding_fn, progress, tas
         entry = add_entry(conn, group.id, row.description, row.command)
         if row.placeholders:
             set_placeholders(conn, entry.id, row.placeholders)
-        vector = embed_fn(f"{row.description} {row.command}")
+        from .embeddings import entry_embed_text
+        text = entry_embed_text(
+            grp_name,
+            row.description,
+            row.command,
+            [ph.get("description", "") for ph in row.placeholders],
+        )
+        vector = embed_fn(text)
         store_embedding_fn(conn, entry.id, vector)
         count += 1
         if progress is not None and task is not None:

@@ -27,3 +27,15 @@ def embed(text: str) -> list[float]:
 
 def embed_batch(texts: list[str]) -> list[list[float]]:
     return get_model().encode(texts, normalize_embeddings=True).tolist()
+
+
+def entry_embed_text(
+    group: str,
+    description: str,
+    command: str,
+    placeholder_descriptions: list[str] | None = None,
+) -> str:
+    parts = [group, description, command]
+    if placeholder_descriptions:
+        parts.extend(d for d in placeholder_descriptions if d)
+    return " ".join(parts)
