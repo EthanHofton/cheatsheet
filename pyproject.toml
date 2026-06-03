@@ -1,0 +1,23 @@
+[tool.poetry]
+name = "cheatsheet"
+version = "0.1.0"
+description = "Terminal cheatsheet manager with semantic search"
+authors = ["Ethan Hofton <ethan.hofton@solidatus.com>"]
+packages = [{ include = "cheatsheet" }]
+
+[tool.poetry.scripts]
+cheatsheet = "cheatsheet.cli:cli"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+click = "^8.1"
+rich = "^14.0"
+sentence-transformers = "^5.1"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.0"
+pytest-cov = "^5.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
