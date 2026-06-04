@@ -241,9 +241,9 @@ def reindex_cmd(ctx):
 
         texts = [
             entry_embed_text(
+                sheet_name,
                 e.group_name,
                 e.description,
-                e.command,
                 [ph.description for ph in e.placeholders],
             )
             for e in entries
@@ -368,12 +368,12 @@ def entry_update(ctx, entry_id, description, command, group):
                                command=command, group_id=new_group_id)
 
         if description is not None or command is not None:
-            from .embeddings import embed, entry_embed_text
+            from .embeddings import embed_doc, entry_embed_text
             with Status("[dim]Re-embedding…[/]", console=console):
-                vector = embed(entry_embed_text(
+                vector = embed_doc(entry_embed_text(
+                    updated.sheet_name,
                     updated.group_name,
                     updated.description,
-                    updated.command,
                     [ph.description for ph in updated.placeholders],
                 ))
             store_embedding(conn, entry_id, vector)
@@ -699,16 +699,16 @@ def _resolve_group(conn, sheet, group_name: str | None):
 
 
 def _single_add(conn, sheet, description: str, command: str, group_name: str | None):
-    from .embeddings import embed, entry_embed_text
+    from .embeddings import embed_doc, entry_embed_text
     grp = _resolve_group(conn, sheet, group_name)
     entry = add_entry(conn, grp.id, description, command)
-    vector = embed(entry_embed_text(grp.name, description, command))
+    vector = embed_doc(entry_embed_text(sheet.name, grp.name, description))
     store_embedding(conn, entry.id, vector)
     print_success(f"Added '{description}' → {sheet.name}/{grp.name} (#{entry.id})")
 
 
 def _interactive_add(conn, sheet):
-    from .embeddings import embed, entry_embed_text
+    from .embeddings import embed_doc, entry_embed_text
     params = get_params(conn, sheet.id)
     click.echo(f"Adding entries to '{sheet.name}'. Leave description blank to finish.\n")
     if params:
@@ -729,7 +729,7 @@ def _interactive_add(conn, sheet):
                 click.echo(f"  ! {e.format_message()}")
                 continue
             entry = add_entry(conn, grp.id, description.strip(), command.strip())
-            vector = embed(entry_embed_text(grp.name, description.strip(), command.strip()))
+            vector = embed_doc(entry_embed_text(sheet.name, grp.name, description.strip()))
             store_embedding(conn, entry.id, vector)
             print_success(f"Added '{description}' → {sheet.name}/{grp.name} (#{entry.id})")
             click.echo()
